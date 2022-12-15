@@ -1,0 +1,51 @@
+version: "3.3"
+networks:
+   caddy_caddy:
+     external: true
+services:
+
+  traefik:
+    image: traefik:latest
+    container_name: "traefik"
+    command:
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--accessLog.filePath=/var/log/access.log"
+      - "--api.insecure=true" #dashboard
+      - "--providers.docker=true" #enables the Docker configuration discovery
+      - "--providers.docker.exposedbydefault=false" #esta opción ignora todos los docker que no tengan traefik.enable=true
+      - "--entrypoints.web.address=:80" #- create an entrypoint called web, listening on :80
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      #- "--log.level=ERROR"
+      - "--entrypoints.websecure.address=:443" #crea el entrypoint secure.address 443 que 
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true" # new
+      - "--certificatesresolvers.myresolver.acme.email=ajimtor630@g.educaand.es" # new
+      - "--certificatesresolvers.myresolver.acme.storage=./letsencrypt/acme.json"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+    labels:
+    
+      # Explicitly tell Traefik to expose this container
+    - "traefik.enable=true"
+    # The domain the service will respond to
+    - "traefik.http.routers.traefik.rule=Host(`traefik.chillington.fun`)"
+    # Allow request only from the predefined entry point named "web"
+    - "traefik.http.routers.traefik.entrypoints=web"
+    - "traefik.http.routers.traefik.entrypoints=websecure"
+    - "traefik.http.routers.traefik.service=traefik"
+    - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+    - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+        # global http -> https redirect
+    - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
+    - "traefik.http.routers.http-catchall.entrypoints=web"
+    - "traefik.http.routers.http-catchall.middlewares=redirect-to-https@docker"
+    - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=websecure"
+    - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      caddy_caddy:
